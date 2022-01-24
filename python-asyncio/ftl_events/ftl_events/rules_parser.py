@@ -1,4 +1,4 @@
-import rule_types
+import ftl_events.rule_types as rule_types
 
 
 def parse_rule_sets(rule_sets):

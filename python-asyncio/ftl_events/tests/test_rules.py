@@ -59,3 +59,9 @@ def test_rules():
     post('test_rules1', {'x': '5'})
 
 
+
+def test_generate_rules():
+    pass
+
+
+

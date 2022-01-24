@@ -2,7 +2,7 @@
 
 """
 Usage:
-    ftl-events [options] <rules>
+    ftl-events [options] <rules.yml> <vars.yml> <inventory.yml>
 
 Options:
     -h, --help        Show this page
@@ -14,7 +14,7 @@ import os
 import logging
 import sys
 import yaml
-import rules_parser
+import ftl_events.rules_parser as rules_parser
 import multiprocessing as mp
 import runpy
 import jinja2
