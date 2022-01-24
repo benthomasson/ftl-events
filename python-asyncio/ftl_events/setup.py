@@ -10,9 +10,10 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = [ 'pyrete',
+requirements = [ 'docopt',
                  'asyncio',
-                 'faster_than_light' ]
+                 'faster_than_light',
+                 'durable_rules']
 
 test_requirements = ['pytest>=3', ]
 
@@ -43,4 +44,9 @@ setup(
     url='https://github.com/benthomasson/ftl_events',
     version='0.1.1',
     zip_safe=False,
+    entry_points={
+        'console_scripts': [
+            'ftl-events = ftl_events.cli:entry_point',
+        ],
+    }
 )
