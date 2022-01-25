@@ -15,10 +15,12 @@ import logging
 import sys
 import yaml
 import ftl_events.rules_parser as rules_parser
+import ftl_events.rule_generator as rule_generator
 import multiprocessing as mp
 import runpy
 import jinja2
 import asyncio
+import durable.lang
 from faster_than_light import run_module, load_inventory
 
 logger = logging.getLogger('cli')
@@ -46,9 +48,17 @@ def start_sources(sources, variables, queue):
         module.get('main')(queue, args)
 
 
-def run_rules(rules, variables, inventory, queue):
-    pass
+def run_ruleset(ruleset, variables, inventory, queue):
 
+    print([ruleset])
+    durable_ruleset = rule_generator.generate_rulesets([ruleset], variables)
+    print([x.define() for x in durable_ruleset])
+
+    while True:
+        data = queue.get()
+        print(data)
+        print(ruleset.name)
+        durable.lang.post(ruleset.name, data)
 
 def main(args=None):
     if args is None:
@@ -71,11 +81,10 @@ def main(args=None):
 
     for ruleset in rulesets:
         sources = ruleset.sources
-        rules = ruleset.rules
         queue = mp.Queue()
 
         tasks.append(mp.Process(target=start_sources, args=(sources, variables, queue)))
-        tasks.append(mp.Process(target=run_rules, args=(rules, variables, inventory, queue,)))
+        tasks.append(mp.Process(target=run_ruleset, args=(ruleset, variables, inventory, queue,)))
 
     for task in tasks:
         task.start()
