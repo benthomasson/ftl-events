@@ -58,7 +58,10 @@ def run_ruleset(ruleset, variables, inventory, queue):
         data = queue.get()
         print(data)
         print(ruleset.name)
-        durable.lang.post(ruleset.name, data)
+        try:
+            durable.lang.post(ruleset.name, data)
+        except durable.engine.MessageNotHandledException:
+            print(f'MessageNotHandledException: {data}')
 
 def main(args=None):
     if args is None:
