@@ -60,8 +60,14 @@ def test_rules():
 
 
 
-def test_generate_rules():
-    pass
+def test_assert_facts():
 
+    some_rules = ruleset('test_assert_facts')
 
+    with some_rules:
+        @when_all(+m.subject.x)
+        def output(c):
+            print('Fact: {0} {1} {2}'.format(c.m.subject.x, c.m.predicate, c.m.object))
+
+    assert_fact('test_assert_facts',  { 'subject': {'x': 'Kermit'}, 'predicate': 'eats', 'object': 'flies' })
 
