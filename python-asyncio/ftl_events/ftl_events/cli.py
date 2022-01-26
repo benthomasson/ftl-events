@@ -5,9 +5,11 @@ Usage:
     ftl-events [options] <rules.yml> <vars.yml> <inventory.yml>
 
 Options:
-    -h, --help        Show this page
-    --debug            Show debug logging
-    --verbose        Show verbose logging
+    -h, --help            Show this page
+    --redis_host_name=<h> Redis host name
+    --redis_port=<p>      Redis port
+    --debug               Show debug logging
+    --verbose             Show verbose logging
 """
 from docopt import docopt
 import os
@@ -16,11 +18,13 @@ import sys
 import yaml
 import ftl_events.rules_parser as rules_parser
 import ftl_events.rule_generator as rule_generator
+from ftl_events.durability import provide_durability
 import multiprocessing as mp
 import runpy
 import jinja2
 import asyncio
 import durable.lang
+from urllib.parse import urlparse
 from faster_than_light import run_module, load_inventory
 
 logger = logging.getLogger('cli')
@@ -48,7 +52,10 @@ def start_sources(sources, variables, queue):
         module.get('main')(queue, args)
 
 
-def run_ruleset(ruleset, variables, inventory, queue):
+def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redis_port=None):
+
+    if redis_host_name and redis_port:
+        provide_durability(durable.lang.get_host())
 
     print([ruleset])
     durable_ruleset = rule_generator.generate_rulesets([ruleset], variables)
@@ -56,6 +63,9 @@ def run_ruleset(ruleset, variables, inventory, queue):
 
     while True:
         data = queue.get()
+        print(data)
+        if not data:
+            continue
         print(data)
         print(ruleset.name)
         try:
@@ -87,7 +97,7 @@ def main(args=None):
         queue = mp.Queue()
 
         tasks.append(mp.Process(target=start_sources, args=(sources, variables, queue)))
-        tasks.append(mp.Process(target=run_ruleset, args=(ruleset, variables, inventory, queue,)))
+        tasks.append(mp.Process(target=run_ruleset, args=(ruleset, variables, inventory, queue, parsed_args['--redis_host_name'], parsed_args['--redis_port'])))
 
     for task in tasks:
         task.start()
