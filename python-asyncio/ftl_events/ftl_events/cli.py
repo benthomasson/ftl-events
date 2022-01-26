@@ -55,7 +55,7 @@ def start_sources(sources, variables, queue):
 def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redis_port=None):
 
     if redis_host_name and redis_port:
-        provide_durability(durable.lang.get_host())
+        provide_durability(durable.lang.get_host(), redis_host_name, redis_port)
 
     print([ruleset])
     durable_ruleset = rule_generator.generate_rulesets([ruleset], variables)
