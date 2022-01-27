@@ -5,6 +5,8 @@ import durable.lang
 from durable.lang import *
 from pyparsing import pyparsing_common, infix_notation, OpAssoc, one_of, ParserElement, QuotedString
 ParserElement.enable_packrat()
+from ftl_events.condition_parser import condition as condition_parser
+from ftl_events.rule_generator import visit_condition
 
 
 def call(args, **kwargs):
@@ -29,7 +31,6 @@ class OperatorExpression(NamedTuple):
     operator: str
     right: str
 
-
 integer = pyparsing_common.signed_integer
 varname = pyparsing_common.identifier.copy().add_parse_action(lambda toks: Identifier(toks[0]))
 
@@ -48,7 +49,6 @@ arith_expr = infix_notation(integer | varname | string1 | string2,
                                 ('>=', 2, OpAssoc.LEFT),
                                 ('<=', 2, OpAssoc.LEFT),
                             ])
-
 
 def test_infix():
     arith_expr.run_tests('''
@@ -116,3 +116,41 @@ def test_m():
     print(visit(result, m).define())
     print((m.x != m.y).define())
     assert visit(result, m).define() == (m.x != m.y).define()
+
+
+def test_condition_parser():
+    assert m
+    assert m.x
+    assert m.x.define() == {'$m': 'x'}
+    assert m.x > m.y
+    assert (m.x > m.y).define() == {'$gt': {'x': {'$m': 'y'}}}
+    assert m.x == m.y
+    assert (m.x == m.y).define() == {'x': {'$m': 'y'}}
+    assert m.x < m.y
+    assert (m.x < m.y).define() == {'$lt': {'x': {'$m': 'y'}}}
+
+    result = condition_parser.parseString('text')[0]
+    print(result)
+    print(visit_condition(result, m).define())
+
+    result = condition_parser.parseString('""')[0]
+    print(result)
+    print(visit_condition(result, m))
+
+    result = condition_parser.parseString('text != ""')[0]
+    print(result)
+    print(visit_condition(result, m).define())
+    print((m.text != "").define())
+    assert visit_condition(result, m).define() == (m.text != "").define()
+
+    result = condition_parser.parseString('x != y')[0]
+    print(result)
+    print(visit_condition(result, m).define())
+    print((m.x != m.y).define())
+    assert visit_condition(result, m).define() == (m.x != m.y).define()
+
+    result = condition_parser.parseString('payload.text != ""')[0]
+    print(result)
+    print(visit_condition(result, m).define())
+    print((m.x != m.y).define())
+    assert visit_condition(result, m).define() == (m.payload.text != "").define()

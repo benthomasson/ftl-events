@@ -1,13 +1,14 @@
 
 from durable.lang import m
-from pyparsing import pyparsing_common, infix_notation, OpAssoc, one_of, ParserElement, QuotedString
+from pyparsing import pyparsing_common, infix_notation, OpAssoc, one_of, ParserElement, QuotedString, ZeroOrMore, Combine
 ParserElement.enable_packrat()
 from ftl_events.condition_types import Identifier, String, OperatorExpression
 
 
 
 integer = pyparsing_common.signed_integer
-varname = pyparsing_common.identifier.copy().add_parse_action(lambda toks: Identifier(toks[0]))
+ident = pyparsing_common.identifier
+varname = Combine(ident + ZeroOrMore('.' + ident)).copy().add_parse_action(lambda toks: Identifier(toks[0]))
 
 
 string1 = QuotedString("'").copy().add_parse_action(lambda toks: String(toks[0]))
