@@ -82,7 +82,8 @@ def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redi
         print(data)
         print(ruleset.name)
         try:
-            durable.lang.post(ruleset.name, data)
+            durable.lang.assert_fact(ruleset.name, data)
+            durable.lang.retract_fact(ruleset.name, data)
         except durable.engine.MessageNotHandledException:
             print(f'MessageNotHandledException: {data}')
 
@@ -100,8 +101,8 @@ def main(args=None):
     rulesets = load_rules(parsed_args)
     inventory = load_inventory(parsed_args['--inventory'])
 
-    print(variables)
-    print(rulesets)
+    print("Variables:", variables)
+    print("Rulesets:", rulesets)
 
     tasks = []
 
@@ -112,9 +113,11 @@ def main(args=None):
         tasks.append(mp.Process(target=start_sources, args=(sources, variables, queue)))
         tasks.append(mp.Process(target=run_ruleset, args=(ruleset, variables, inventory, queue, parsed_args['--redis_host_name'], parsed_args['--redis_port'])))
 
+    print('Starting processes')
     for task in tasks:
         task.start()
 
+    print('Joining processes')
     for task in tasks:
         task.join()
 
