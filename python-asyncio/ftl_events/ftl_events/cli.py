@@ -2,10 +2,13 @@
 
 """
 Usage:
-    ftl-events [options] <rules.yml> <vars.yml> <inventory.yml>
+    ftl-events [options] <rules.yml>
 
 Options:
     -h, --help            Show this page
+    -v, --vars=<v>        Variables file
+    -i, --inventory=<i>   Inventory
+    --env-vars=<e>        Comma separated list of variables to import from the environment
     --redis_host_name=<h> Redis host name
     --redis_port=<p>      Redis port
     --debug               Show debug logging
@@ -31,9 +34,19 @@ logger = logging.getLogger('cli')
 
 
 def load_vars(parsed_args):
-    with open(parsed_args['<vars.yml>']) as f:
-        return yaml.safe_load(f.read())
+    variables = dict()
+    if parsed_args['--vars']:
+        with open(parsed_args['--vars']) as f:
+            variables.update(yaml.safe_load(f.read()))
 
+    if parsed_args['--env-vars']:
+        for env_var in parsed_args['--env-vars'].split(','):
+            env_var = env_var.strip()
+            if env_var not in os.environ:
+                raise KeyError(f'Could not find environment variable "{env_var}"')
+            variables[env_var] = os.environ[env_var]
+
+    return variables
 
 def load_rules(parsed_args):
     with open(parsed_args['<rules.yml>']) as f:
@@ -85,7 +98,7 @@ def main(args=None):
         logging.basicConfig(level=logging.WARNING)
     variables = load_vars(parsed_args)
     rulesets = load_rules(parsed_args)
-    inventory = load_inventory(parsed_args['<inventory.yml>'])
+    inventory = load_inventory(parsed_args['--inventory'])
 
     print(variables)
     print(rulesets)
