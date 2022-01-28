@@ -59,6 +59,11 @@ def substitute_variables(value, context):
 
 def start_sources(sources, variables, queue):
 
+    logger = mp.get_logger()
+    #logger.setLevel(logging.INFO)
+
+    logger.info('start_sources')
+
     for source in sources:
         module = runpy.run_path(os.path.join('sources', source.source_name + '.py'))
         args = {k: substitute_variables(v, variables) for k, v in source.source_args.items()}
@@ -67,25 +72,33 @@ def start_sources(sources, variables, queue):
 
 def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redis_port=None):
 
+    logger = mp.get_logger()
+    #logger.setLevel(logging.INFO)
+
+    logger.info('run_ruleset')
+
     if redis_host_name and redis_port:
         provide_durability(durable.lang.get_host(), redis_host_name, redis_port)
 
-    print([ruleset])
+    logger.info(str([ruleset]))
     durable_ruleset = rule_generator.generate_rulesets([ruleset], variables)
-    print([x.define() for x in durable_ruleset])
+    logger.info(str([x.define() for x in durable_ruleset]))
 
     while True:
+        logger.info("Waiting for event")
         data = queue.get()
-        print(data)
+        logger.info(str(data))
         if not data:
             continue
-        print(data)
-        print(ruleset.name)
+        logger.info(str(data))
+        logger.info(str(ruleset.name))
         try:
+            logger.info('Asserting event')
             durable.lang.assert_fact(ruleset.name, data)
+            logger.info('Retracting event')
             durable.lang.retract_fact(ruleset.name, data)
         except durable.engine.MessageNotHandledException:
-            print(f'MessageNotHandledException: {data}')
+            logger.error(f'MessageNotHandledException: {data}')
 
 def main(args=None):
     if args is None:
@@ -97,12 +110,14 @@ def main(args=None):
         logging.basicConfig(level=logging.INFO)
     else:
         logging.basicConfig(level=logging.WARNING)
+    logger = mp.log_to_stderr()
+    logger.setLevel(logging.INFO)
     variables = load_vars(parsed_args)
     rulesets = load_rules(parsed_args)
     inventory = load_inventory(parsed_args['--inventory'])
 
-    print("Variables:", variables)
-    print("Rulesets:", rulesets)
+    logger.info(f"Variables: {variables}")
+    logger.info(f"Rulesets: {rulesets}")
 
     tasks = []
 
@@ -113,11 +128,11 @@ def main(args=None):
         tasks.append(mp.Process(target=start_sources, args=(sources, variables, queue)))
         tasks.append(mp.Process(target=run_ruleset, args=(ruleset, variables, inventory, queue, parsed_args['--redis_host_name'], parsed_args['--redis_port'])))
 
-    print('Starting processes')
+    logger.info('Starting processes')
     for task in tasks:
         task.start()
 
-    print('Joining processes')
+    logger.info('Joining processes')
     for task in tasks:
         task.join()
 

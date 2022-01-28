@@ -4,6 +4,9 @@ import time
 import datetime
 import traceback
 import sys
+import logging
+
+logger = logging.getLogger('durability')
 
 def unix_time(dt):
     epoch = datetime.datetime.utcfromtimestamp(0)
@@ -42,7 +45,7 @@ def provide_durability(host, redis_host_name = 'localhost', port = 6379):
         try:
             r.hset(get_hset_name(ruleset, sid), mid, format_message(action_type, content))
         except BaseException as e:
-            print(e)
+            logger.error(e)
             return 601
 
         return 0
@@ -51,7 +54,7 @@ def provide_durability(host, redis_host_name = 'localhost', port = 6379):
         try:
             r.hdel(get_hset_name(ruleset, sid), mid)
         except BaseException as e:
-            print(e)
+            logger.error(e)
             return 602
 
         return 0
@@ -64,7 +67,7 @@ def provide_durability(host, redis_host_name = 'localhost', port = 6379):
 
             r.rpush(get_list_name(ruleset, sid), format_message(action_type, content))
         except BaseException as e:
-            print(e)
+            logger.error(e)
             return 603 
 
         return 0
@@ -77,7 +80,7 @@ def provide_durability(host, redis_host_name = 'localhost', port = 6379):
                 r.delete(get_list_name(ruleset, sid))
                 host.complete_get_queued_messages(ruleset, sid, format_messages(messages))
         except BaseException as e:
-            print(e)
+            logger.error(e)
             return 604
 
         return 0
@@ -90,7 +93,7 @@ def provide_durability(host, redis_host_name = 'localhost', port = 6379):
                 messages = r.hvals(get_hset_name(ruleset, sid))
                 host.complete_get_idle_state(ruleset, sid, format_messages(messages))
         except BaseException as e:
-            print(e)
+            logger.error(e)
             return 606
 
         return 0

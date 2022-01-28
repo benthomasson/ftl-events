@@ -14,7 +14,8 @@ requirements = ['docopt',
                 'asyncio',
                 'faster_than_light',
                 'durable_rules',
-                'pyparsing']
+                'pyparsing',
+                'redis']
 
 test_requirements = ['pytest>=3', ]
 

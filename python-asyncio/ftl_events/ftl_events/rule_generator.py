@@ -2,10 +2,12 @@
 from durable.lang import ruleset, rule, m
 import asyncio
 import jinja2
+import logging
 from faster_than_light import run_module, load_inventory
 from ftl_events.condition_parser import parse_condition
 from ftl_events.condition_types import Identifier, String, OperatorExpression
 
+logger = logging.getLogger('cli')
 
 def substitute_variables(value, context):
     return jinja2.Template(value, undefined=jinja2.StrictUndefined).render(context)
@@ -13,18 +15,18 @@ def substitute_variables(value, context):
 
 def call_module(module, module_args, variables, c):
     try:
-        print(c)
+        logger.info(c)
         variables_copy = variables.copy()
         variables_copy['event'] = str(c.m._d)
-        print('running')
+        logger.info('running')
         asyncio.run(run_module(load_inventory('inventory.yml'),
                                ['modules'],
                                module,
                                modules=[module],
                                module_args={k: substitute_variables(v, variables_copy) for k, v in module_args.items()}))
-        print('ran')
+        logger.info('ran')
     except Exception as e:
-        print(e)
+        logger.error(e)
 
 
 def visit_condition(parsed_condition, condition):
@@ -46,7 +48,7 @@ def generate_condition(ftl_condition):
 
 def make_fn(ftl_rule, variables):
     def fn(c):
-        print(f'calling {ftl_rule.name}')
+        logger.info(f'calling {ftl_rule.name}')
         call_module(ftl_rule.action.module,
                     ftl_rule.action.module_args,
                     variables,
@@ -64,7 +66,7 @@ def generate_rulesets(ftl_rulesets, variables):
             for ftl_rule in ftl_ruleset.rules:
                 fn = make_fn(ftl_rule, variables)
                 r = rule('all', True, generate_condition(ftl_rule.condition))(fn)
-                print(r.define())
+                logger.info(r.define())
         rulesets.append(a_ruleset)
 
     return rulesets
