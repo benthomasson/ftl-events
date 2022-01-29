@@ -17,7 +17,7 @@ def call_module(module, module_args, variables, c):
     try:
         logger.info(c)
         variables_copy = variables.copy()
-        variables_copy['event'] = str(c.m._d)
+        variables_copy['event'] = c.m._d
         logger.info('running')
         asyncio.run(run_module(load_inventory('inventory.yml'),
                                ['modules'],
