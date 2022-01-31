@@ -20,7 +20,10 @@ def parse_event_sources(sources):
         if transform in source:
             del source['transform']
         source_name = list(source.keys())[0]
-        source_args = {k: v for k, v in source[source_name].items()}
+        if source[source_name]:
+            source_args = {k: v for k, v in source[source_name].items()}
+        else:
+            source_args = {}
         source_list.append(rule_types.EventSource(name=name,
                                                   source_name=source_name,
                                                   source_args=source_args,
@@ -42,7 +45,10 @@ def parse_rules(rules):
 
 def parse_action(action):
     module_name = list(action.keys())[0]
-    module_args = {k: v for k, v in action[module_name].items()}
+    if action[module_name]:
+        module_args = {k: v for k, v in action[module_name].items()}
+    else:
+        module_args = {}
     return rule_types.Action(module=module_name, module_args=module_args)
 
 

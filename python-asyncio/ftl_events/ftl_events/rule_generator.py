@@ -13,13 +13,13 @@ def substitute_variables(value, context):
     return jinja2.Template(value, undefined=jinja2.StrictUndefined).render(context)
 
 
-def call_module(module, module_args, variables, c):
+def call_module(module, module_args, variables, inventory, c):
     try:
         logger.info(c)
         variables_copy = variables.copy()
         variables_copy['event'] = c.m._d
         logger.info('running')
-        asyncio.run(run_module(load_inventory('inventory.yml'),
+        asyncio.run(run_module(inventory,
                                ['modules'],
                                module,
                                modules=[module],
@@ -46,16 +46,17 @@ def generate_condition(ftl_condition):
     return visit_condition(parse_condition(ftl_condition.value), m)
 
 
-def make_fn(ftl_rule, variables):
+def make_fn(ftl_rule, variables, inventory):
     def fn(c):
         logger.info(f'calling {ftl_rule.name}')
         call_module(ftl_rule.action.module,
                     ftl_rule.action.module_args,
                     variables,
+                    inventory,
                     c)
     return fn
 
-def generate_rulesets(ftl_rulesets, variables):
+def generate_rulesets(ftl_rulesets, variables, inventory):
 
     rulesets = []
 
@@ -64,7 +65,7 @@ def generate_rulesets(ftl_rulesets, variables):
         with a_ruleset:
 
             for ftl_rule in ftl_ruleset.rules:
-                fn = make_fn(ftl_rule, variables)
+                fn = make_fn(ftl_rule, variables, inventory)
                 r = rule('all', True, generate_condition(ftl_rule.condition))(fn)
                 logger.info(r.define())
         rulesets.append(a_ruleset)

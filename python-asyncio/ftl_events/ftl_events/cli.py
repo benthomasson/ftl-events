@@ -29,6 +29,7 @@ import asyncio
 import durable.lang
 from urllib.parse import urlparse
 from faster_than_light import run_module, load_inventory
+from ftl_events.messages import Shutdown
 
 logger = logging.getLogger('cli')
 
@@ -54,7 +55,10 @@ def load_rules(parsed_args):
 
 
 def substitute_variables(value, context):
-    return jinja2.Template(value, undefined=jinja2.StrictUndefined).render(context)
+    if isinstance(value, str):
+        return jinja2.Template(value, undefined=jinja2.StrictUndefined).render(context)
+    else:
+        return value
 
 
 def start_sources(sources, variables, queue):
@@ -69,6 +73,8 @@ def start_sources(sources, variables, queue):
         args = {k: substitute_variables(v, variables) for k, v in source.source_args.items()}
         module.get('main')(queue, args)
 
+    queue.put(Shutdown())
+
 
 def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redis_port=None):
 
@@ -81,12 +87,14 @@ def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redi
         provide_durability(durable.lang.get_host(), redis_host_name, redis_port)
 
     logger.info(str([ruleset]))
-    durable_ruleset = rule_generator.generate_rulesets([ruleset], variables)
+    durable_ruleset = rule_generator.generate_rulesets([ruleset], variables, inventory)
     logger.info(str([x.define() for x in durable_ruleset]))
 
     while True:
         logger.info("Waiting for event")
         data = queue.get()
+        if isinstance(data, Shutdown):
+            break
         logger.info(str(data))
         if not data:
             continue

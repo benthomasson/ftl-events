@@ -1,0 +1,33 @@
+all:
+  hosts:
+    localhost0:
+      ansible_connection: local
+      ansible_python_interpreter: /Users/ben/venv/ftl_events/bin/python
+    localhost1:
+      ansible_connection: local
+      ansible_python_interpreter: /Users/ben/venv/ftl_events/bin/python
+    localhost2:
+      ansible_connection: local
+      ansible_python_interpreter: /Users/ben/venv/ftl_events/bin/python
+    localhost3:
+      ansible_connection: local
+      ansible_python_interpreter: /Users/ben/venv/ftl_events/bin/python
+    localhost4:
+      ansible_connection: local
+      ansible_python_interpreter: /Users/ben/venv/ftl_events/bin/python
+    localhost5:
+      ansible_connection: local
+      ansible_python_interpreter: /Users/ben/venv/ftl_events/bin/python
+    localhost6:
+      ansible_connection: local
+      ansible_python_interpreter: /Users/ben/venv/ftl_events/bin/python
+    localhost7:
+      ansible_connection: local
+      ansible_python_interpreter: /Users/ben/venv/ftl_events/bin/python
+    localhost8:
+      ansible_connection: local
+      ansible_python_interpreter: /Users/ben/venv/ftl_events/bin/python
+    localhost9:
+      ansible_connection: local
+      ansible_python_interpreter: /Users/ben/venv/ftl_events/bin/python
+

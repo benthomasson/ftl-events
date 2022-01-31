@@ -1,0 +1,12 @@
+---
+- name: 1 Rule
+  hosts: all
+  sources:
+    - name: performance source
+      performance:
+        limit: 1000
+  rules:
+    - name: a rule
+      condition: text == "hello"
+      action:
+        argtest:
