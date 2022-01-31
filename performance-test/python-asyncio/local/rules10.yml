@@ -1,12 +1,48 @@
 ---
-- name: 1 Rule
+- name: 10 Rules
   hosts: all
   sources:
     - name: performance source
       performance:
-        limit: 10
+        limit: "{{limit}}"
   rules:
-    - name: a rule
+    - name: a rule 1
+      condition: text == "hello"
+      action:
+        argtest:
+    - name: a rule 2
+      condition: text == "hello"
+      action:
+        argtest:
+    - name: a rule 3
+      condition: text == "hello"
+      action:
+        argtest:
+    - name: a rule 4
+      condition: text == "hello"
+      action:
+        argtest:
+    - name: a rule 5
+      condition: text == "hello"
+      action:
+        argtest:
+    - name: a rule 6
+      condition: text == "hello"
+      action:
+        argtest:
+    - name: a rule 7
+      condition: text == "hello"
+      action:
+        argtest:
+    - name: a rule 8
+      condition: text == "hello"
+      action:
+        argtest:
+    - name: a rule 9
+      condition: text == "hello"
+      action:
+        argtest:
+    - name: a rule 10
       condition: text == "hello"
       action:
         argtest:

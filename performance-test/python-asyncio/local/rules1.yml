@@ -4,7 +4,7 @@
   sources:
     - name: performance source
       performance:
-        limit: 1
+        limit: "{{limit}}"
   rules:
     - name: a rule
       condition: text == "hello"
