@@ -13,6 +13,7 @@ Options:
     --redis_port=<p>      Redis port
     --debug               Show debug logging
     --verbose             Show verbose logging
+    --requirements=<r>    Requirements.txt for gate
 """
 from docopt import docopt
 import os
@@ -27,7 +28,6 @@ import runpy
 import jinja2
 import asyncio
 import durable.lang
-from urllib.parse import urlparse
 from faster_than_light import run_module, load_inventory
 from ftl_events.messages import Shutdown
 
@@ -49,6 +49,7 @@ def load_vars(parsed_args):
 
     return variables
 
+
 def load_rules(parsed_args):
     with open(parsed_args['<rules.yml>']) as f:
         return rules_parser.parse_rule_sets(yaml.safe_load(f.read()))
@@ -64,7 +65,6 @@ def substitute_variables(value, context):
 def start_sources(sources, variables, queue):
 
     logger = mp.get_logger()
-    #logger.setLevel(logging.INFO)
 
     logger.info('start_sources')
 
@@ -76,19 +76,45 @@ def start_sources(sources, variables, queue):
     queue.put(Shutdown())
 
 
-def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redis_port=None):
+async def call_module(module, module_args, variables, inventory, c, gate_cache=None, dependencies=None):
+    try:
+        logger.info(c)
+        variables_copy = variables.copy()
+        variables_copy['event'] = c.m._d
+        logger.info('running')
+        await run_module(inventory,
+                         ['modules'],
+                         module,
+                         modules=[module],
+                         module_args={k: substitute_variables(v, variables_copy) for k, v in module_args.items()},
+                        gate_cache=gate_cache,
+                        dependencies=dependencies)
+        logger.info('ran')
+    except Exception as e:
+        logger.error(e)
+
+
+def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redis_port=None, dependencies=None):
 
     logger = mp.get_logger()
-    #logger.setLevel(logging.INFO)
 
     logger.info('run_ruleset')
 
     if redis_host_name and redis_port:
         provide_durability(durable.lang.get_host(), redis_host_name, redis_port)
 
+    plan = asyncio.Queue()
+
     logger.info(str([ruleset]))
-    durable_ruleset = rule_generator.generate_rulesets([ruleset], variables, inventory)
+    durable_ruleset = rule_generator.generate_rulesets([ruleset], variables, inventory, plan)
     logger.info(str([x.define() for x in durable_ruleset]))
+
+    asyncio.run(_run_ruleset_async(queue, plan, ruleset, dependencies))
+
+
+async def _run_ruleset_async(queue, plan, ruleset, dependencies):
+
+    gate_cache = dict()
 
     while True:
         logger.info("Waiting for event")
@@ -103,10 +129,16 @@ def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redi
         try:
             logger.info('Asserting event')
             durable.lang.assert_fact(ruleset.name, data)
+            while not plan.empty():
+                item = await plan.get()
+                print(item)
+                await call_module(*item, gate_cache=gate_cache, dependencies=dependencies)
+
             logger.info('Retracting event')
             durable.lang.retract_fact(ruleset.name, data)
         except durable.engine.MessageNotHandledException:
             logger.error(f'MessageNotHandledException: {data}')
+
 
 def main(args=None):
     if args is None:
@@ -129,12 +161,17 @@ def main(args=None):
 
     tasks = []
 
+    dependencies = None
+    if parsed_args['--requirements']:
+        with open(parsed_args['--requirements']) as f:
+            dependencies = [x for x in f.read().splitlines() if x]
+
     for ruleset in rulesets:
         sources = ruleset.sources
         queue = mp.Queue()
 
         tasks.append(mp.Process(target=start_sources, args=(sources, variables, queue)))
-        tasks.append(mp.Process(target=run_ruleset, args=(ruleset, variables, inventory, queue, parsed_args['--redis_host_name'], parsed_args['--redis_port'])))
+        tasks.append(mp.Process(target=run_ruleset, args=(ruleset, variables, inventory, queue, parsed_args['--redis_host_name'], parsed_args['--redis_port'], dependencies)))
 
     logger.info('Starting processes')
     for task in tasks:
@@ -145,6 +182,7 @@ def main(args=None):
         task.join()
 
     return 0
+
 
 def entry_point():
     main(sys.argv[1:])
