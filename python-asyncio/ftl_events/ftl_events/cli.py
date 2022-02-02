@@ -5,15 +5,16 @@ Usage:
     ftl-events [options] <rules.yml>
 
 Options:
-    -h, --help            Show this page
-    -v, --vars=<v>        Variables file
-    -i, --inventory=<i>   Inventory
-    --env-vars=<e>        Comma separated list of variables to import from the environment
-    --redis_host_name=<h> Redis host name
-    --redis_port=<p>      Redis port
-    --debug               Show debug logging
-    --verbose             Show verbose logging
-    --requirements=<r>    Requirements.txt for gate
+    -h, --help                  Show this page
+    -v, --vars=<v>              Variables file
+    -i, --inventory=<i>         Inventory
+    -M=<M>, --module_dir=<M>    Module dir
+    --env-vars=<e>              Comma separated list of variables to import from the environment
+    --redis_host_name=<h>       Redis host name
+    --redis_port=<p>            Redis port
+    --debug                     Show debug logging
+    --verbose                   Show verbose logging
+    --requirements=<r>          Requirements.txt for gate
 """
 from docopt import docopt
 import os
@@ -29,7 +30,9 @@ import jinja2
 import asyncio
 import durable.lang
 from faster_than_light import run_module, load_inventory
+from faster_than_light.gate import build_ftl_gate
 from ftl_events.messages import Shutdown
+from ftl_events.util import get_modules
 
 logger = logging.getLogger('cli')
 
@@ -76,25 +79,25 @@ def start_sources(sources, variables, queue):
     queue.put(Shutdown())
 
 
-async def call_module(module, module_args, variables, inventory, c, gate_cache=None, dependencies=None):
+async def call_module(module, module_args, variables, inventory, c, modules=None, module_dirs=None, gate_cache=None, dependencies=None):
     try:
         logger.info(c)
         variables_copy = variables.copy()
         variables_copy['event'] = c.m._d
         logger.info('running')
         await run_module(inventory,
-                         ['modules'],
+                         module_dirs,
                          module,
-                         modules=[module],
+                         modules=modules,
                          module_args={k: substitute_variables(v, variables_copy) for k, v in module_args.items()},
-                        gate_cache=gate_cache,
-                        dependencies=dependencies)
+                         gate_cache=gate_cache,
+                         dependencies=dependencies)
         logger.info('ran')
     except Exception as e:
         logger.error(e)
 
 
-def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redis_port=None, dependencies=None):
+def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redis_port=None, module_dirs=None, dependencies=None):
 
     logger = mp.get_logger()
 
@@ -109,12 +112,16 @@ def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redi
     durable_ruleset = rule_generator.generate_rulesets([ruleset], variables, inventory, plan)
     logger.info(str([x.define() for x in durable_ruleset]))
 
-    asyncio.run(_run_ruleset_async(queue, plan, ruleset, dependencies))
+
+    asyncio.run(_run_ruleset_async(queue, plan, ruleset, dependencies, module_dirs))
 
 
-async def _run_ruleset_async(queue, plan, ruleset, dependencies):
+async def _run_ruleset_async(queue, plan, ruleset, dependencies, module_dirs):
 
     gate_cache = dict()
+
+    modules = get_modules([ruleset])
+    build_ftl_gate(modules, module_dirs, dependencies)
 
     while True:
         logger.info("Waiting for event")
@@ -132,7 +139,11 @@ async def _run_ruleset_async(queue, plan, ruleset, dependencies):
             while not plan.empty():
                 item = await plan.get()
                 print(item)
-                await call_module(*item, gate_cache=gate_cache, dependencies=dependencies)
+                await call_module(*item,
+                                  module_dirs=module_dirs,
+                                  modules=modules,
+                                  gate_cache=gate_cache,
+                                  dependencies=dependencies)
 
             logger.info('Retracting event')
             durable.lang.retract_fact(ruleset.name, data)
@@ -171,7 +182,8 @@ def main(args=None):
         queue = mp.Queue()
 
         tasks.append(mp.Process(target=start_sources, args=(sources, variables, queue)))
-        tasks.append(mp.Process(target=run_ruleset, args=(ruleset, variables, inventory, queue, parsed_args['--redis_host_name'], parsed_args['--redis_port'], dependencies)))
+        tasks.append(mp.Process(target=run_ruleset, args=(ruleset, variables, inventory, queue,
+                     parsed_args['--redis_host_name'], parsed_args['--redis_port'], [parsed_args['--module_dir']], dependencies)))
 
     logger.info('Starting processes')
     for task in tasks:
