@@ -7,10 +7,6 @@ from ftl_events.condition_types import Identifier, String, OperatorExpression
 logger = logging.getLogger("cli")
 
 
-def substitute_variables(value, context):
-    return jinja2.Template(value, undefined=jinja2.StrictUndefined).render(context)
-
-
 def add_to_plan(module, module_args, variables, inventory, plan, c):
     plan.put_nowait((module, module_args, variables, inventory, c))
 

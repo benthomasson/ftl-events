@@ -1,7 +1,14 @@
 
-
 from durable.lang import *
 import durable.lang
+import yaml
+import os
+import asyncio
+
+from ftl_events.rules_parser import parse_rule_sets
+from ftl_events.rule_generator import generate_rulesets
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 def test_m():
     assert m
@@ -71,3 +78,27 @@ def test_assert_facts():
 
     assert_fact('test_assert_facts',  { 'subject': {'x': 'Kermit'}, 'predicate': 'eats', 'object': 'flies' })
 
+
+
+def test_parse_rules():
+    os.chdir(HERE)
+    with open('rules.yml') as f:
+        data = yaml.safe_load(f.read())
+
+    rulesets = parse_rule_sets(data)
+
+
+def test_generate_rules():
+    os.chdir(HERE)
+    with open('rules.yml') as f:
+        data = yaml.safe_load(f.read())
+
+    rulesets = parse_rule_sets(data)
+    ruleset_plans = [ (ruleset, asyncio.Queue()) for ruleset in rulesets ]
+    durable_rulesets = generate_rulesets(ruleset_plans, dict(), dict())
+
+    assert_fact('Demo rules',  {'payload': {'text': 'hello'}})
+
+    assert ruleset_plans[0][1].get_nowait()[0] == 'slack'
+    assert ruleset_plans[0][1].get_nowait()[0] == 'assert_fact'
+    assert ruleset_plans[0][1].get_nowait()[0] == 'log'

@@ -16,9 +16,7 @@ def parse_event_sources(sources):
     for source in sources:
         name = source['name']
         del source['name']
-        transform = source.get('transform')
-        if transform in source:
-            del source['transform']
+        transform = source.pop('transform', None)
         source_name = list(source.keys())[0]
         if source[source_name]:
             source_args = {k: v for k, v in source[source_name].items()}
