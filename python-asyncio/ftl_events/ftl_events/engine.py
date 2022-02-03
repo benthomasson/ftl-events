@@ -16,7 +16,7 @@ from ftl_events.util import get_modules, substitute_variables
 from ftl_events.builtin import modules as builtin_modules
 
 
-logger = logging.getLogger("ftl_events.engine")
+logger = mp.get_logger()
 
 
 def start_sources(sources, variables, queue):
@@ -54,7 +54,7 @@ async def call_module(
                 k: substitute_variables(v, variables_copy)
                 for k, v in module_args.items()
             }
-            print(module_args)
+            logger.info(module_args)
             builtin_modules[module](**module_args)
         except Exception as e:
             logger.error(e)
@@ -147,7 +147,7 @@ async def _run_rulesets_async(ruleset_queue_plans, dependencies, module_dirs):
                 durable.lang.assert_fact(ruleset.name, data)
                 while not plan.empty():
                     item = await plan.get()
-                    print(item)
+                    logger.info(item)
                     await call_module(
                         *item,
                         module_dirs=module_dirs,
