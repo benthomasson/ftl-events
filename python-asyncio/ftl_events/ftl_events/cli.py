@@ -1,5 +1,3 @@
-
-
 """
 Usage:
     ftl-events [options] <rules.yml>
@@ -21,30 +19,23 @@ import os
 import logging
 import sys
 import yaml
-import ftl_events.rules_parser as rules_parser
-import ftl_events.rule_generator as rule_generator
-from ftl_events.durability import provide_durability
 import multiprocessing as mp
-import runpy
-import jinja2
-import asyncio
-import durable.lang
-from faster_than_light import run_module, load_inventory
-from faster_than_light.gate import build_ftl_gate
-from ftl_events.messages import Shutdown
-from ftl_events.util import get_modules
 
-logger = logging.getLogger('cli')
+import ftl_events.rules_parser as rules_parser
+from faster_than_light import load_inventory
+from ftl_events.engine import start_sources, run_ruleset
+
+logger = logging.getLogger("cli")
 
 
 def load_vars(parsed_args):
     variables = dict()
-    if parsed_args['--vars']:
-        with open(parsed_args['--vars']) as f:
+    if parsed_args["--vars"]:
+        with open(parsed_args["--vars"]) as f:
             variables.update(yaml.safe_load(f.read()))
 
-    if parsed_args['--env-vars']:
-        for env_var in parsed_args['--env-vars'].split(','):
+    if parsed_args["--env-vars"]:
+        for env_var in parsed_args["--env-vars"].split(","):
             env_var = env_var.strip()
             if env_var not in os.environ:
                 raise KeyError(f'Could not find environment variable "{env_var}"')
@@ -54,110 +45,17 @@ def load_vars(parsed_args):
 
 
 def load_rules(parsed_args):
-    with open(parsed_args['<rules.yml>']) as f:
+    with open(parsed_args["<rules.yml>"]) as f:
         return rules_parser.parse_rule_sets(yaml.safe_load(f.read()))
-
-
-def substitute_variables(value, context):
-    if isinstance(value, str):
-        return jinja2.Template(value, undefined=jinja2.StrictUndefined).render(context)
-    else:
-        return value
-
-
-def start_sources(sources, variables, queue):
-
-    logger = mp.get_logger()
-
-    logger.info('start_sources')
-
-    for source in sources:
-        module = runpy.run_path(os.path.join('sources', source.source_name + '.py'))
-        args = {k: substitute_variables(v, variables) for k, v in source.source_args.items()}
-        module.get('main')(queue, args)
-
-    queue.put(Shutdown())
-
-
-async def call_module(module, module_args, variables, inventory, c, modules=None, module_dirs=None, gate_cache=None, dependencies=None):
-    try:
-        logger.info(c)
-        variables_copy = variables.copy()
-        variables_copy['event'] = c.m._d
-        logger.info('running')
-        await run_module(inventory,
-                         module_dirs,
-                         module,
-                         modules=modules,
-                         module_args={k: substitute_variables(v, variables_copy) for k, v in module_args.items()},
-                         gate_cache=gate_cache,
-                         dependencies=dependencies)
-        logger.info('ran')
-    except Exception as e:
-        logger.error(e)
-
-
-def run_ruleset(ruleset, variables, inventory, queue, redis_host_name=None, redis_port=None, module_dirs=None, dependencies=None):
-
-    logger = mp.get_logger()
-
-    logger.info('run_ruleset')
-
-    if redis_host_name and redis_port:
-        provide_durability(durable.lang.get_host(), redis_host_name, redis_port)
-
-    plan = asyncio.Queue()
-
-    logger.info(str([ruleset]))
-    durable_ruleset = rule_generator.generate_rulesets([ruleset], variables, inventory, plan)
-    logger.info(str([x.define() for x in durable_ruleset]))
-
-
-    asyncio.run(_run_ruleset_async(queue, plan, ruleset, dependencies, module_dirs))
-
-
-async def _run_ruleset_async(queue, plan, ruleset, dependencies, module_dirs):
-
-    gate_cache = dict()
-
-    modules = get_modules([ruleset])
-    build_ftl_gate(modules, module_dirs, dependencies)
-
-    while True:
-        logger.info("Waiting for event")
-        data = queue.get()
-        if isinstance(data, Shutdown):
-            break
-        logger.info(str(data))
-        if not data:
-            continue
-        logger.info(str(data))
-        logger.info(str(ruleset.name))
-        try:
-            logger.info('Asserting event')
-            durable.lang.assert_fact(ruleset.name, data)
-            while not plan.empty():
-                item = await plan.get()
-                print(item)
-                await call_module(*item,
-                                  module_dirs=module_dirs,
-                                  modules=modules,
-                                  gate_cache=gate_cache,
-                                  dependencies=dependencies)
-
-            logger.info('Retracting event')
-            durable.lang.retract_fact(ruleset.name, data)
-        except durable.engine.MessageNotHandledException:
-            logger.error(f'MessageNotHandledException: {data}')
 
 
 def main(args=None):
     if args is None:
         args = sys.argv[1:]
     parsed_args = docopt(__doc__, args)
-    if parsed_args['--debug']:
+    if parsed_args["--debug"]:
         logging.basicConfig(level=logging.DEBUG)
-    elif parsed_args['--verbose']:
+    elif parsed_args["--verbose"]:
         logging.basicConfig(level=logging.INFO)
     else:
         logging.basicConfig(level=logging.WARNING)
@@ -165,7 +63,7 @@ def main(args=None):
     logger.setLevel(logging.INFO)
     variables = load_vars(parsed_args)
     rulesets = load_rules(parsed_args)
-    inventory = load_inventory(parsed_args['--inventory'])
+    inventory = load_inventory(parsed_args["--inventory"])
 
     logger.info(f"Variables: {variables}")
     logger.info(f"Rulesets: {rulesets}")
@@ -173,8 +71,8 @@ def main(args=None):
     tasks = []
 
     dependencies = None
-    if parsed_args['--requirements']:
-        with open(parsed_args['--requirements']) as f:
+    if parsed_args["--requirements"]:
+        with open(parsed_args["--requirements"]) as f:
             dependencies = [x for x in f.read().splitlines() if x]
 
     for ruleset in rulesets:
@@ -182,14 +80,27 @@ def main(args=None):
         queue = mp.Queue()
 
         tasks.append(mp.Process(target=start_sources, args=(sources, variables, queue)))
-        tasks.append(mp.Process(target=run_ruleset, args=(ruleset, variables, inventory, queue,
-                     parsed_args['--redis_host_name'], parsed_args['--redis_port'], [parsed_args['--module_dir']], dependencies)))
+        tasks.append(
+            mp.Process(
+                target=run_ruleset,
+                args=(
+                    ruleset,
+                    variables,
+                    inventory,
+                    queue,
+                    parsed_args["--redis_host_name"],
+                    parsed_args["--redis_port"],
+                    [parsed_args["--module_dir"]],
+                    dependencies,
+                ),
+            )
+        )
 
-    logger.info('Starting processes')
+    logger.info("Starting processes")
     for task in tasks:
         task.start()
 
-    logger.info('Joining processes')
+    logger.info("Joining processes")
     for task in tasks:
         task.join()
 
