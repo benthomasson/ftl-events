@@ -23,7 +23,7 @@ import multiprocessing as mp
 
 import ftl_events.rules_parser as rules_parser
 from faster_than_light import load_inventory
-from ftl_events.engine import start_sources, run_ruleset
+from ftl_events.engine import start_sources, run_rulesets
 
 logger = logging.getLogger("cli")
 
@@ -75,27 +75,30 @@ def main(args=None):
         with open(parsed_args["--requirements"]) as f:
             dependencies = [x for x in f.read().splitlines() if x]
 
+    ruleset_queues = []
+
     for ruleset in rulesets:
         sources = ruleset.sources
         queue = mp.Queue()
 
         tasks.append(mp.Process(target=start_sources, args=(sources, variables, queue)))
-        tasks.append(
-            mp.Process(
-                target=run_ruleset,
-                args=(
-                    ruleset,
-                    variables,
-                    inventory,
-                    queue,
-                    parsed_args["--redis_host_name"],
-                    parsed_args["--redis_port"],
-                    [parsed_args["--module_dir"]],
-                    dependencies,
-                ),
-            )
-        )
+        ruleset_queues.append((ruleset, queue))
 
+    tasks.append(
+        mp.Process(
+            target=run_rulesets,
+            args=(
+                ruleset_queues,
+                variables,
+                inventory,
+                queue,
+                parsed_args["--redis_host_name"],
+                parsed_args["--redis_port"],
+                [parsed_args["--module_dir"]],
+                dependencies,
+            ),
+        )
+    )
     logger.info("Starting processes")
     for task in tasks:
         task.start()

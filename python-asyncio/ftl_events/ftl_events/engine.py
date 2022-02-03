@@ -1,13 +1,16 @@
 import os
 import logging
-import ftl_events.rule_generator as rule_generator
-from ftl_events.durability import provide_durability
 import multiprocessing as mp
 import runpy
 import asyncio
 import durable.lang
+import select
+
 from faster_than_light import run_module
 from faster_than_light.gate import build_ftl_gate
+
+import ftl_events.rule_generator as rule_generator
+from ftl_events.durability import provide_durability
 from ftl_events.messages import Shutdown
 from ftl_events.util import get_modules, substitute_variables
 from ftl_events.builtin import modules as builtin_modules
@@ -78,8 +81,8 @@ async def call_module(
             logger.error(e)
 
 
-def run_ruleset(
-    ruleset,
+def run_rulesets(
+    ruleset_queues,
     variables,
     inventory,
     queue,
@@ -98,47 +101,62 @@ def run_ruleset(
 
     plan = asyncio.Queue()
 
-    logger.info(str([ruleset]))
-    durable_ruleset = rule_generator.generate_rulesets(
-        [ruleset], variables, inventory, plan
+    ruleset_queue_plans = [
+        (ruleset, queue, asyncio.Queue()) for ruleset, queue in ruleset_queues
+    ]
+    ruleset_plans = [(ruleset, plan) for ruleset, _, plan in ruleset_queue_plans]
+    rulesets = [ruleset for ruleset, _, _ in ruleset_queue_plans]
+
+    logger.info(str([rulesets]))
+    durable_rulesets = rule_generator.generate_rulesets(
+        ruleset_plans, variables, inventory
     )
-    logger.info(str([x.define() for x in durable_ruleset]))
+    logger.info(str([x.define() for x in durable_rulesets]))
 
-    asyncio.run(_run_ruleset_async(queue, plan, ruleset, dependencies, module_dirs))
+    asyncio.run(_run_rulesets_async(ruleset_queue_plans, dependencies, module_dirs))
 
 
-async def _run_ruleset_async(queue, plan, ruleset, dependencies, module_dirs):
+async def _run_rulesets_async(ruleset_queue_plans, dependencies, module_dirs):
 
     gate_cache = dict()
 
-    modules = get_modules([ruleset])
+    rulesets = [ruleset for ruleset, _, _ in ruleset_queue_plans]
+
+    modules = get_modules(rulesets)
     build_ftl_gate(modules, module_dirs, dependencies)
+
+    queue_readers = {i[1]._reader: i for i in ruleset_queue_plans}
 
     while True:
         logger.info("Waiting for event")
-        data = queue.get()
-        if isinstance(data, Shutdown):
-            break
-        logger.info(str(data))
-        if not data:
+        read_ready, _, _ = select.select(queue_readers.keys(), [], [])
+        if not read_ready:
             continue
-        logger.info(str(data))
-        logger.info(str(ruleset.name))
-        try:
-            logger.info("Asserting event")
-            durable.lang.assert_fact(ruleset.name, data)
-            while not plan.empty():
-                item = await plan.get()
-                print(item)
-                await call_module(
-                    *item,
-                    module_dirs=module_dirs,
-                    modules=modules,
-                    gate_cache=gate_cache,
-                    dependencies=dependencies,
-                )
+        for queue_reader in read_ready:
+            ruleset, queue, plan = queue_readers[queue_reader]
+            data = queue.get()
+            if isinstance(data, Shutdown):
+                break
+            logger.info(str(data))
+            if not data:
+                continue
+            logger.info(str(data))
+            logger.info(str(ruleset.name))
+            try:
+                logger.info("Asserting event")
+                durable.lang.assert_fact(ruleset.name, data)
+                while not plan.empty():
+                    item = await plan.get()
+                    print(item)
+                    await call_module(
+                        *item,
+                        module_dirs=module_dirs,
+                        modules=modules,
+                        gate_cache=gate_cache,
+                        dependencies=dependencies,
+                    )
 
-            logger.info("Retracting event")
-            durable.lang.retract_fact(ruleset.name, data)
-        except durable.engine.MessageNotHandledException:
-            logger.error(f"MessageNotHandledException: {data}")
+                logger.info("Retracting event")
+                durable.lang.retract_fact(ruleset.name, data)
+            except durable.engine.MessageNotHandledException:
+                logger.error(f"MessageNotHandledException: {data}")
