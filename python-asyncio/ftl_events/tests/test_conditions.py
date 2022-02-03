@@ -154,3 +154,9 @@ def test_condition_parser():
     print(visit_condition(result, m).define())
     print((m.x != m.y).define())
     assert visit_condition(result, m).define() == (m.payload.text != "").define()
+
+    result = condition_parser.parseString('i == 1')[0]
+    print(result)
+    print(visit_condition(result, m).define())
+    print((m.x != m.y).define())
+    assert visit_condition(result, m).define() == (m.i == 1).define()

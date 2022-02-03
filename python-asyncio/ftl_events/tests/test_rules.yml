@@ -1,0 +1,20 @@
+---
+- name: Test rules4
+  hosts: all
+  sources:
+    - name: range
+      range:
+        limit: 4
+  rules:
+    - name:
+      condition: i == 1
+      action:
+        assert_fact:
+          ruleset: Test rules4
+          fact:
+            i: 1
+    - name:
+      condition: i == 2
+      action:
+        argtest:
+

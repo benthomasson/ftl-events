@@ -91,7 +91,6 @@ def main(args=None):
                 ruleset_queues,
                 variables,
                 inventory,
-                queue,
                 parsed_args["--redis_host_name"],
                 parsed_args["--redis_port"],
                 [parsed_args["--module_dir"]],

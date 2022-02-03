@@ -27,6 +27,7 @@ def start_sources(sources, variables, queue):
 
     for source in sources:
         module = runpy.run_path(os.path.join("sources", source.source_name + ".py"))
+
         args = {
             k: substitute_variables(v, variables) for k, v in source.source_args.items()
         }
@@ -85,7 +86,6 @@ def run_rulesets(
     ruleset_queues,
     variables,
     inventory,
-    queue,
     redis_host_name=None,
     redis_port=None,
     module_dirs=None,
@@ -111,6 +111,7 @@ def run_rulesets(
     durable_rulesets = rule_generator.generate_rulesets(
         ruleset_plans, variables, inventory
     )
+    print(str([x.define() for x in durable_rulesets]))
     logger.info(str([x.define() for x in durable_rulesets]))
 
     asyncio.run(_run_rulesets_async(ruleset_queue_plans, dependencies, module_dirs))
@@ -127,16 +128,15 @@ async def _run_rulesets_async(ruleset_queue_plans, dependencies, module_dirs):
 
     queue_readers = {i[1]._reader: i for i in ruleset_queue_plans}
 
+
     while True:
         logger.info("Waiting for event")
         read_ready, _, _ = select.select(queue_readers.keys(), [], [])
-        if not read_ready:
-            continue
         for queue_reader in read_ready:
             ruleset, queue, plan = queue_readers[queue_reader]
             data = queue.get()
             if isinstance(data, Shutdown):
-                break
+                return
             logger.info(str(data))
             if not data:
                 continue

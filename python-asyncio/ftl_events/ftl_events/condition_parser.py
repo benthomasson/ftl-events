@@ -2,11 +2,11 @@
 from durable.lang import m
 from pyparsing import pyparsing_common, infix_notation, OpAssoc, one_of, ParserElement, QuotedString, ZeroOrMore, Combine
 ParserElement.enable_packrat()
-from ftl_events.condition_types import Identifier, String, OperatorExpression
+from ftl_events.condition_types import Identifier, String, OperatorExpression, Integer
 
 
 
-integer = pyparsing_common.signed_integer
+integer = pyparsing_common.signed_integer.copy().add_parse_action(lambda toks: Integer(toks[0]))
 ident = pyparsing_common.identifier
 varname = Combine(ident + ZeroOrMore('.' + ident)).copy().add_parse_action(lambda toks: Identifier(toks[0]))
 

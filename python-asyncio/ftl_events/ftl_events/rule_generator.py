@@ -2,7 +2,7 @@ from durable.lang import ruleset, rule, m
 import jinja2
 import logging
 from ftl_events.condition_parser import parse_condition
-from ftl_events.condition_types import Identifier, String, OperatorExpression
+from ftl_events.condition_types import Identifier, String, OperatorExpression, Integer
 
 logger = logging.getLogger("cli")
 
@@ -15,6 +15,8 @@ def visit_condition(parsed_condition, condition):
     if isinstance(parsed_condition, Identifier):
         return condition.__getattr__(parsed_condition.value)
     if isinstance(parsed_condition, String):
+        return parsed_condition.value
+    if isinstance(parsed_condition, Integer):
         return parsed_condition.value
     if isinstance(parsed_condition, OperatorExpression):
         if parsed_condition.operator == "!=":
