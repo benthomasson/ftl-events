@@ -37,3 +37,10 @@ def test_cli6():
     os.chdir(HERE)
     os.environ['TEST_X'] = '5'
     ftl_events.cli.main(['-M', 'modules', '-i', 'inventory.yml', '--requirements', 'requirements.txt', 'test_rules2.yml'])
+
+def test_cli7():
+    os.chdir(HERE)
+    os.environ['TEST_X'] = '5'
+    with pytest.raises(KeyError):
+        ftl_events.cli.main(['-M', 'modules', '-i', 'inventory.yml', '--env-vars', 'NOT_TEST_X', 'test_rules2.yml'])
+
