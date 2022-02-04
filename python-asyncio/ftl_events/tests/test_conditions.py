@@ -5,7 +5,7 @@ import durable.lang
 from durable.lang import *
 from pyparsing import pyparsing_common, infix_notation, OpAssoc, one_of, ParserElement, QuotedString
 ParserElement.enable_packrat()
-from ftl_events.condition_parser import condition as condition_parser
+from ftl_events.condition_parser import parse_condition
 from ftl_events.rule_generator import visit_condition
 
 
@@ -118,7 +118,7 @@ def test_m():
     assert visit(result, m).define() == (m.x != m.y).define()
 
 
-def test_condition_parser():
+def test_parse_condition():
     assert m
     assert m.x
     assert m.x.define() == {'$m': 'x'}
@@ -129,33 +129,33 @@ def test_condition_parser():
     assert m.x < m.y
     assert (m.x < m.y).define() == {'$lt': {'x': {'$m': 'y'}}}
 
-    result = condition_parser.parseString('text')[0]
+    result = parse_condition('text')[0]
     print(result)
     print(visit_condition(result, m).define())
 
-    result = condition_parser.parseString('""')[0]
+    result = parse_condition('""')[0]
     print(result)
     print(visit_condition(result, m))
 
-    result = condition_parser.parseString('text != ""')[0]
+    result = parse_condition('text != ""')[0]
     print(result)
     print(visit_condition(result, m).define())
     print((m.text != "").define())
     assert visit_condition(result, m).define() == (m.text != "").define()
 
-    result = condition_parser.parseString('x != y')[0]
+    result = parse_condition('x != y')[0]
     print(result)
     print(visit_condition(result, m).define())
     print((m.x != m.y).define())
     assert visit_condition(result, m).define() == (m.x != m.y).define()
 
-    result = condition_parser.parseString('payload.text != ""')[0]
+    result = parse_condition('payload.text != ""')[0]
     print(result)
     print(visit_condition(result, m).define())
     print((m.x != m.y).define())
     assert visit_condition(result, m).define() == (m.payload.text != "").define()
 
-    result = condition_parser.parseString('i == 1')[0]
+    result = parse_condition('i == 1')[0]
     print(result)
     print(visit_condition(result, m).define())
     print((m.x != m.y).define())

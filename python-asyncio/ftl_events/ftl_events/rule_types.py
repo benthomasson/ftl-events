@@ -1,5 +1,10 @@
+from __future__ import annotations
 
-from typing import NamedTuple, Union, List
+from typing import NamedTuple, Union, List, Any, Dict
+import ftl_events.condition_types as ct
+
+import asyncio
+import multiprocessing as mp
 
 
 class EventSource(NamedTuple):
@@ -15,7 +20,7 @@ class Action(NamedTuple):
 
 
 class Condition(NamedTuple):
-    value: str
+    value: ct.Condition
 
 
 class Rule(NamedTuple):
@@ -29,3 +34,26 @@ class RuleSet(NamedTuple):
     hosts: Union[str, List[str]]
     sources: List[EventSource]
     rules: List[Rule]
+
+
+class ModuleContext(NamedTuple):
+    module: str
+    modules_args: Dict
+    variables: Dict
+    inventory: Dict
+    c: Any
+
+
+class RuleSetPlan(NamedTuple):
+    ruleset: RuleSet
+    plan: asyncio.Queue
+
+class RuleSetQueue(NamedTuple):
+    ruleset: RuleSet
+    queue: mp.Queue
+
+class RuleSetQueuePlan(NamedTuple):
+    ruleset: RuleSet
+    queue: mp.Queue
+    plan: asyncio.Queue
+

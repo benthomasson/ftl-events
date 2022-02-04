@@ -2,7 +2,7 @@
 from durable.lang import m
 from pyparsing import pyparsing_common, infix_notation, OpAssoc, one_of, ParserElement, QuotedString, ZeroOrMore, Combine
 ParserElement.enable_packrat()
-from ftl_events.condition_types import Identifier, String, OperatorExpression, Integer
+from ftl_events.condition_types import Identifier, String, OperatorExpression, Integer, Condition
 
 
 
@@ -24,8 +24,7 @@ condition = infix_notation(integer | varname | string1 | string2,
                                 ('==', 2, OpAssoc.LEFT, lambda toks: OperatorExpression(*toks[0])),
                                 ('>=', 2, OpAssoc.LEFT),
                                 ('<=', 2, OpAssoc.LEFT),
-                            ])
+                            ]).add_parse_action(lambda toks: Condition(toks[0]))
 
-
-def parse_condition(condition_string):
+def parse_condition(condition_string: str) -> Condition:
     return condition.parseString(condition_string)[0]

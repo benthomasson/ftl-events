@@ -14,12 +14,15 @@ from ftl_events.durability import provide_durability
 from ftl_events.messages import Shutdown
 from ftl_events.util import get_modules, substitute_variables
 from ftl_events.builtin import modules as builtin_modules
+from ftl_events.rule_types import EventSource, RuleSetQueue, RuleSetQueuePlan, RuleSetPlan, ModuleContext
+
+from typing import Optional, Dict, List, cast
 
 
 logger = mp.get_logger()
 
 
-def start_sources(sources, variables, queue):
+def start_sources(sources: List[EventSource], variables: Dict, queue: mp.Queue) -> None:
 
     logger = mp.get_logger()
 
@@ -31,22 +34,25 @@ def start_sources(sources, variables, queue):
         args = {
             k: substitute_variables(v, variables) for k, v in source.source_args.items()
         }
-        module.get("main")(queue, args)
+        module["main"](queue, args)
 
     queue.put(Shutdown())
 
 
 async def call_module(
-    module,
-    module_args,
-    variables,
-    inventory,
+    module: str,
+    module_args: Dict,
+    variables: Dict,
+    inventory: Dict,
     c,
-    modules=None,
-    module_dirs=None,
-    gate_cache=None,
-    dependencies=None,
+    modules: Optional[List[str]]=None,
+    module_dirs: Optional[List[str]]=None,
+    gate_cache: Optional[Dict]=None,
+    dependencies: Optional[List[str]]=None,
 ):
+
+    if module_dirs is None:
+        module_dirs = []
     if module in builtin_modules:
         try:
             variables_copy = variables.copy()
@@ -83,13 +89,13 @@ async def call_module(
 
 
 def run_rulesets(
-    ruleset_queues,
-    variables,
-    inventory,
-    redis_host_name=None,
-    redis_port=None,
-    module_dirs=None,
-    dependencies=None,
+    ruleset_queues: List[RuleSetQueue],
+    variables: Dict,
+    inventory: Dict,
+    redis_host_name: Optional[str]=None,
+    redis_port: Optional[int]=None,
+    module_dirs: Optional[List[str]]=None,
+    dependencies: Optional[List[str]]=None,
 ):
 
     logger = mp.get_logger()
@@ -99,12 +105,12 @@ def run_rulesets(
     if redis_host_name and redis_port:
         provide_durability(durable.lang.get_host(), redis_host_name, redis_port)
 
-    plan = asyncio.Queue()
+    plan: asyncio.Queue = asyncio.Queue()
 
     ruleset_queue_plans = [
-        (ruleset, queue, asyncio.Queue()) for ruleset, queue in ruleset_queues
+        RuleSetQueuePlan(ruleset, queue, asyncio.Queue()) for ruleset, queue in ruleset_queues
     ]
-    ruleset_plans = [(ruleset, plan) for ruleset, _, plan in ruleset_queue_plans]
+    ruleset_plans = [RuleSetPlan(ruleset, plan) for ruleset, _, plan in ruleset_queue_plans]
     rulesets = [ruleset for ruleset, _, _ in ruleset_queue_plans]
 
     logger.info(str([rulesets]))
@@ -117,16 +123,16 @@ def run_rulesets(
     asyncio.run(_run_rulesets_async(ruleset_queue_plans, dependencies, module_dirs))
 
 
-async def _run_rulesets_async(ruleset_queue_plans, dependencies, module_dirs):
+async def _run_rulesets_async(ruleset_queue_plans: List[RuleSetQueuePlan], dependencies: Optional[List[str]]=None, module_dirs: Optional[List[str]]=None):
 
-    gate_cache = dict()
+    gate_cache: Dict = dict()
 
     rulesets = [ruleset for ruleset, _, _ in ruleset_queue_plans]
 
     modules = get_modules(rulesets)
     build_ftl_gate(modules, module_dirs, dependencies)
 
-    queue_readers = {i[1]._reader: i for i in ruleset_queue_plans}
+    queue_readers = {i[1]._reader: i for i in ruleset_queue_plans}  # type: ignore
 
 
     while True:
@@ -146,7 +152,7 @@ async def _run_rulesets_async(ruleset_queue_plans, dependencies, module_dirs):
                 logger.info("Asserting event")
                 durable.lang.assert_fact(ruleset.name, data)
                 while not plan.empty():
-                    item = await plan.get()
+                    item = cast(ModuleContext, await plan.get())
                     logger.info(item)
                     await call_module(
                         *item,

@@ -100,8 +100,11 @@ async def test_generate_rules():
         data = yaml.safe_load(f.read())
 
     rulesets = parse_rule_sets(data)
+    print(rulesets)
     ruleset_plans = [ (ruleset, asyncio.Queue()) for ruleset in rulesets ]
     durable_rulesets = generate_rulesets(ruleset_plans, dict(), dict())
+
+    print(durable_rulesets[0].define())
 
     assert_fact('Demo rules',  {'payload': {'text': 'hello'}})
 

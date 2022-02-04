@@ -1,8 +1,11 @@
 import jinja2
 from .builtin import modules as builtin_modules
 
+from ftl_events.rule_types import RuleSet
+from typing import List, Dict, Union
 
-def get_modules(rulesets):
+
+def get_modules(rulesets: List[RuleSet]) -> List[str]:
 
     modules = []
 
@@ -14,7 +17,7 @@ def get_modules(rulesets):
     return list(set(modules))
 
 
-def substitute_variables(value, context):
+def substitute_variables(value: Union[str, int], context: Dict) -> Union[str, int]:
     if isinstance(value, str):
         return jinja2.Template(value, undefined=jinja2.StrictUndefined).render(context)
     else:

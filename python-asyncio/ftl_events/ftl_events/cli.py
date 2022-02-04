@@ -24,11 +24,14 @@ import multiprocessing as mp
 import ftl_events.rules_parser as rules_parser
 from faster_than_light import load_inventory
 from ftl_events.engine import start_sources, run_rulesets
+from ftl_events.rule_types import RuleSet
+
+from typing import Dict, List, Optional
 
 logger = logging.getLogger("cli")
 
 
-def load_vars(parsed_args):
+def load_vars(parsed_args: Dict) -> Dict[str, str]:
     variables = dict()
     if parsed_args["--vars"]:
         with open(parsed_args["--vars"]) as f:
@@ -44,12 +47,12 @@ def load_vars(parsed_args):
     return variables
 
 
-def load_rules(parsed_args):
+def load_rules(parsed_args: dict) -> List[RuleSet]:
     with open(parsed_args["<rules.yml>"]) as f:
         return rules_parser.parse_rule_sets(yaml.safe_load(f.read()))
 
 
-def main(args=None):
+def main(args: Optional[List[str]]=None) -> int:
     if args is None:
         args = sys.argv[1:]
     parsed_args = docopt(__doc__, args)
@@ -79,7 +82,7 @@ def main(args=None):
 
     for ruleset in rulesets:
         sources = ruleset.sources
-        queue = mp.Queue()
+        queue: mp.Queue = mp.Queue()
 
         tasks.append(mp.Process(target=start_sources, args=(sources, variables, queue)))
         ruleset_queues.append((ruleset, queue))
@@ -109,5 +112,5 @@ def main(args=None):
     return 0
 
 
-def entry_point():
+def entry_point() -> None:
     main(sys.argv[1:])

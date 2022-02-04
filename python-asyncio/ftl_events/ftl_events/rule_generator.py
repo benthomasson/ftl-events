@@ -1,40 +1,51 @@
 from durable.lang import ruleset, rule, m
 import jinja2
 import logging
-from ftl_events.condition_parser import parse_condition
-from ftl_events.condition_types import Identifier, String, OperatorExpression, Integer
+import asyncio
+from ftl_events.condition_types import Identifier, String, OperatorExpression, Integer, Condition, ConditionTypes
+
+from ftl_events.rule_types import RuleSetPlan, ModuleContext
+from ftl_events.rule_types import Condition as RuleCondition
+
+
+from typing import Dict, List, Callable
 
 logger = logging.getLogger("cli")
 
 
-def add_to_plan(module, module_args, variables, inventory, plan, c):
-    plan.put_nowait((module, module_args, variables, inventory, c))
+def add_to_plan(module: str, module_args: Dict, variables: Dict, inventory: Dict, plan: asyncio.Queue, c) -> None:
+    plan.put_nowait(ModuleContext(module, module_args, variables, inventory, c))
 
 
-def visit_condition(parsed_condition, condition):
-    if isinstance(parsed_condition, Identifier):
+def visit_condition(parsed_condition: ConditionTypes, condition):
+    if isinstance(parsed_condition, Condition):
+        return visit_condition(parsed_condition.value, condition)
+    elif isinstance(parsed_condition, Identifier):
         return condition.__getattr__(parsed_condition.value)
-    if isinstance(parsed_condition, String):
+    elif isinstance(parsed_condition, String):
         return parsed_condition.value
-    if isinstance(parsed_condition, Integer):
+    elif isinstance(parsed_condition, Integer):
         return parsed_condition.value
-    if isinstance(parsed_condition, OperatorExpression):
+    elif isinstance(parsed_condition, OperatorExpression):
         if parsed_condition.operator == "!=":
             return visit_condition(parsed_condition.left, condition).__ne__(
                 visit_condition(parsed_condition.right, condition)
             )
-    if isinstance(parsed_condition, OperatorExpression):
-        if parsed_condition.operator == "==":
+        elif parsed_condition.operator == "==":
             return visit_condition(parsed_condition.left, condition).__eq__(
                 visit_condition(parsed_condition.right, condition)
             )
+        else:
+            raise Exception(f"Unhandled token {parsed_condition}")
+    else:
+        raise Exception(f"Unhandled token {parsed_condition}")
 
 
-def generate_condition(ftl_condition):
-    return visit_condition(parse_condition(ftl_condition.value), m)
+def generate_condition(ftl_condition: RuleCondition):
+    return visit_condition(ftl_condition.value, m)
 
 
-def make_fn(ftl_rule, variables, inventory, plan):
+def make_fn(ftl_rule, variables: Dict, inventory: Dict, plan: asyncio.Queue) -> Callable:
     def fn(c):
         logger.info(f"calling {ftl_rule.name}")
         add_to_plan(
@@ -49,7 +60,7 @@ def make_fn(ftl_rule, variables, inventory, plan):
     return fn
 
 
-def generate_rulesets(ftl_ruleset_plans, variables, inventory):
+def generate_rulesets(ftl_ruleset_plans: List[RuleSetPlan], variables: Dict, inventory: Dict):
 
     rulesets = []
 

@@ -1,5 +1,7 @@
 
-from typing import NamedTuple
+from typing import NamedTuple, Union
+
+
 
 class Integer(NamedTuple):
     value: int
@@ -14,6 +16,11 @@ class Identifier(NamedTuple):
 
 
 class OperatorExpression(NamedTuple):
-    left: str
+    left: Union[Integer, String]
     operator: str
-    right: str
+    right: Union[Integer, String]
+
+class Condition(NamedTuple):
+    value: Union[Integer, String,  Identifier, OperatorExpression]
+
+ConditionTypes = Union[Condition, OperatorExpression, Identifier, String, Integer]
