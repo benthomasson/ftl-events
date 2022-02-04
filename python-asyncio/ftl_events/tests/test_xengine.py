@@ -35,6 +35,8 @@ def test_run_rulesets():
     queue.put(dict(i=1))
     queue.put(dict(i=2))
     queue.put(dict(i=3))
+    queue.put(dict(i=4))
+    queue.put(dict(i=5))
     queue.put(Shutdown())
 
     run_rulesets(ruleset_queues, dict(), dict(), module_dirs=[os.path.join(HERE, 'modules')])

@@ -4,7 +4,7 @@
   sources:
     - name: range
       range:
-        limit: 4
+        limit: 5
   rules:
     - name:
       condition: i == 1
@@ -17,4 +17,17 @@
       condition: i == 2
       action:
         argtest:
-
+    - name:
+      condition: i == 3
+      action:
+        retract_fact:
+          ruleset: Test rules4
+          fact:
+            i: 1
+    - name:
+      condition: i == 4
+      action:
+        post_event:
+          ruleset: Test rules4
+          fact:
+            i: 1
