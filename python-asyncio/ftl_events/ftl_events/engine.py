@@ -53,7 +53,7 @@ async def call_module(
     module_dirs: Optional[List[str]] = None,
     gate_cache: Optional[Dict] = None,
     dependencies: Optional[List[str]] = None,
-):
+) -> Dict:
 
     logger = mp.get_logger()
 
@@ -68,16 +68,17 @@ async def call_module(
                 for k, v in module_args.items()
             }
             logger.info(module_args)
-            builtin_modules[module](**module_args)
+            result = builtin_modules[module](**module_args)
         except Exception as e:
             logger.error(e)
+            result = dict(error=e)
     else:
         try:
             logger.info(c)
             variables_copy = variables.copy()
             variables_copy["event"] = c.m._d
             logger.info("running")
-            await run_module(
+            result = await run_module(
                 inventory,
                 module_dirs,
                 module,
@@ -92,9 +93,13 @@ async def call_module(
             logger.info("ran")
         except Exception as e:
             logger.error(e)
+            result = dict(error=e)
+
+    return result
 
 
 def run_rulesets(
+    event_log: mp.Queue,
     ruleset_queues: List[RuleSetQueue],
     variables: Dict,
     inventory: Dict,
@@ -127,10 +132,11 @@ def run_rulesets(
     print(str([x.define() for x in durable_rulesets]))
     logger.info(str([x.define() for x in durable_rulesets]))
 
-    asyncio.run(_run_rulesets_async(ruleset_queue_plans, dependencies, module_dirs))
+    asyncio.run(_run_rulesets_async(event_log, ruleset_queue_plans, dependencies, module_dirs))
 
 
 async def _run_rulesets_async(
+    event_log: mp.Queue,
     ruleset_queue_plans: List[RuleSetQueuePlan],
     dependencies: Optional[List[str]] = None,
     module_dirs: Optional[List[str]] = None,
@@ -154,9 +160,11 @@ async def _run_rulesets_async(
             ruleset, queue, plan = queue_readers[queue_reader]
             data = queue.get()
             if isinstance(data, Shutdown):
+                event_log.put(dict(type='Shutdown'))
                 return
             logger.info(str(data))
             if not data:
+                event_log.put(dict(type='EmptyEvent'))
                 continue
             logger.info(str(data))
             logger.info(str(ruleset.name))
@@ -166,7 +174,7 @@ async def _run_rulesets_async(
                 while not plan.empty():
                     item = cast(ModuleContext, await plan.get())
                     logger.info(item)
-                    await call_module(
+                    result = await call_module(
                         *item,
                         module_dirs=module_dirs,
                         modules=modules,
@@ -176,5 +184,7 @@ async def _run_rulesets_async(
 
                 logger.info("Retracting event")
                 durable.lang.retract_fact(ruleset.name, data)
+                event_log.put(dict(type='ProcessedEvent', result=result))
             except durable.engine.MessageNotHandledException:
                 logger.error(f"MessageNotHandledException: {data}")
+                event_log.put(dict(type='MessageNotHandled'))

@@ -12,7 +12,7 @@
         assert_fact:
           ruleset: Test rules4
           fact:
-            i: 1
+            j: 1
     - name:
       condition: i == 2
       action:
@@ -23,11 +23,11 @@
         retract_fact:
           ruleset: Test rules4
           fact:
-            i: 1
+            j: 3
     - name:
       condition: i == 4
       action:
         post_event:
           ruleset: Test rules4
           fact:
-            i: 1
+            j: 4

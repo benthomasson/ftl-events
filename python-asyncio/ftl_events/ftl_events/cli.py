@@ -78,7 +78,7 @@ def main(args: Optional[List[str]] = None) -> int:
 
     ruleset_queues = []
 
-    event_log: mp.Queue() = mp.Queue()
+    event_log: mp.Queue = mp.Queue()
 
     for ruleset in rulesets:
         sources = ruleset.sources
@@ -91,6 +91,7 @@ def main(args: Optional[List[str]] = None) -> int:
         mp.Process(
             target=run_rulesets,
             args=(
+                event_log,
                 ruleset_queues,
                 variables,
                 inventory,
