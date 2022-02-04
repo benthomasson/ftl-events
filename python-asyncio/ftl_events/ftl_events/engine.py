@@ -24,21 +24,23 @@ from ftl_events.rule_types import (
 from typing import Optional, Dict, List, cast
 
 
-def start_sources(sources: List[EventSource], variables: Dict, queue: mp.Queue) -> None:
+def start_sources(sources: List[EventSource], source_dirs: List[str], variables: Dict, queue: mp.Queue) -> None:
 
     logger = mp.get_logger()
 
     logger.info("start_sources")
 
-    for source in sources:
-        module = runpy.run_path(os.path.join("sources", source.source_name + ".py"))
+    try:
 
-        args = {
-            k: substitute_variables(v, variables) for k, v in source.source_args.items()
-        }
-        module["main"](queue, args)
+        for source in sources:
+            module = runpy.run_path(os.path.join(source_dirs[0], source.source_name + ".py"))
 
-    queue.put(Shutdown())
+            args = {
+                k: substitute_variables(v, variables) for k, v in source.source_args.items()
+            }
+            module["main"](queue, args)
+    finally:
+        queue.put(Shutdown())
 
 
 async def call_module(

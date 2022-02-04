@@ -7,6 +7,7 @@ Options:
     -v, --vars=<v>              Variables file
     -i, --inventory=<i>         Inventory
     -M=<M>, --module_dir=<M>    Module dir
+    -S=<S>, --source_dir=<S>    Source dir
     --env-vars=<e>              Comma separated list of variables to import from the environment
     --redis_host_name=<h>       Redis host name
     --redis_port=<p>            Redis port
@@ -77,11 +78,13 @@ def main(args: Optional[List[str]] = None) -> int:
 
     ruleset_queues = []
 
+    event_log: mp.Queue() = mp.Queue()
+
     for ruleset in rulesets:
         sources = ruleset.sources
         queue: mp.Queue = mp.Queue()
 
-        tasks.append(mp.Process(target=start_sources, args=(sources, variables, queue)))
+        tasks.append(mp.Process(target=start_sources, args=(sources, [parsed_args['--source_dir']], variables, queue)))
         ruleset_queues.append((ruleset, queue))
 
     tasks.append(
