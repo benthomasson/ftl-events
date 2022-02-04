@@ -65,7 +65,7 @@ def test_rules():
 
     assert some_rules.define() == ('test_rules1', {'r_0': {'all': [{'m': {'x': 5}}],
                                                            'run': x}})
-    post('test_rules1', {'x': '5'})
+    post('test_rules1', {'x': 5})
 
 
 

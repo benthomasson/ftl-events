@@ -1,8 +1,14 @@
 from durable.lang import ruleset, rule, m
-import jinja2
-import logging
 import asyncio
-from ftl_events.condition_types import Identifier, String, OperatorExpression, Integer, Condition, ConditionTypes
+import multiprocessing as mp
+from ftl_events.condition_types import (
+    Identifier,
+    String,
+    OperatorExpression,
+    Integer,
+    Condition,
+    ConditionTypes,
+)
 
 from ftl_events.rule_types import RuleSetPlan, ModuleContext
 from ftl_events.rule_types import Condition as RuleCondition
@@ -10,10 +16,15 @@ from ftl_events.rule_types import Condition as RuleCondition
 
 from typing import Dict, List, Callable
 
-logger = logging.getLogger("cli")
 
-
-def add_to_plan(module: str, module_args: Dict, variables: Dict, inventory: Dict, plan: asyncio.Queue, c) -> None:
+def add_to_plan(
+    module: str,
+    module_args: Dict,
+    variables: Dict,
+    inventory: Dict,
+    plan: asyncio.Queue,
+    c,
+) -> None:
     plan.put_nowait(ModuleContext(module, module_args, variables, inventory, c))
 
 
@@ -45,8 +56,11 @@ def generate_condition(ftl_condition: RuleCondition):
     return visit_condition(ftl_condition.value, m)
 
 
-def make_fn(ftl_rule, variables: Dict, inventory: Dict, plan: asyncio.Queue) -> Callable:
+def make_fn(
+    ftl_rule, variables: Dict, inventory: Dict, plan: asyncio.Queue
+) -> Callable:
     def fn(c):
+        logger = mp.get_logger()
         logger.info(f"calling {ftl_rule.name}")
         add_to_plan(
             ftl_rule.action.module,
@@ -60,8 +74,11 @@ def make_fn(ftl_rule, variables: Dict, inventory: Dict, plan: asyncio.Queue) -> 
     return fn
 
 
-def generate_rulesets(ftl_ruleset_plans: List[RuleSetPlan], variables: Dict, inventory: Dict):
+def generate_rulesets(
+    ftl_ruleset_plans: List[RuleSetPlan], variables: Dict, inventory: Dict
+):
 
+    logger = mp.get_logger()
     rulesets = []
 
     for ftl_ruleset, plan in ftl_ruleset_plans:

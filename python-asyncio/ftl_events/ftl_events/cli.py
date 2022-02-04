@@ -28,8 +28,6 @@ from ftl_events.rule_types import RuleSet
 
 from typing import Dict, List, Optional
 
-logger = logging.getLogger("cli")
-
 
 def load_vars(parsed_args: Dict) -> Dict[str, str]:
     variables = dict()
@@ -52,18 +50,17 @@ def load_rules(parsed_args: dict) -> List[RuleSet]:
         return rules_parser.parse_rule_sets(yaml.safe_load(f.read()))
 
 
-def main(args: Optional[List[str]]=None) -> int:
+def main(args: Optional[List[str]] = None) -> int:
     if args is None:
         args = sys.argv[1:]
     parsed_args = docopt(__doc__, args)
-    if parsed_args["--debug"]:
-        logging.basicConfig(level=logging.DEBUG)
-    elif parsed_args["--verbose"]:
-        logging.basicConfig(level=logging.INFO)
-    else:
-        logging.basicConfig(level=logging.WARNING)
     logger = mp.log_to_stderr()
-    logger.setLevel(logging.INFO)
+    if parsed_args["--debug"]:
+        logger.setLevel(logging.DEBUG)
+    elif parsed_args["--verbose"]:
+        logger.setLevel(logging.INFO)
+    else:
+        logger.setLevel(logging.WARNING)
     variables = load_vars(parsed_args)
     rulesets = load_rules(parsed_args)
     inventory = load_inventory(parsed_args["--inventory"])

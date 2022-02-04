@@ -1,5 +1,4 @@
 import os
-import logging
 import multiprocessing as mp
 import runpy
 import asyncio
@@ -14,12 +13,15 @@ from ftl_events.durability import provide_durability
 from ftl_events.messages import Shutdown
 from ftl_events.util import get_modules, substitute_variables
 from ftl_events.builtin import modules as builtin_modules
-from ftl_events.rule_types import EventSource, RuleSetQueue, RuleSetQueuePlan, RuleSetPlan, ModuleContext
+from ftl_events.rule_types import (
+    EventSource,
+    RuleSetQueue,
+    RuleSetQueuePlan,
+    RuleSetPlan,
+    ModuleContext,
+)
 
 from typing import Optional, Dict, List, cast
-
-
-logger = mp.get_logger()
 
 
 def start_sources(sources: List[EventSource], variables: Dict, queue: mp.Queue) -> None:
@@ -45,11 +47,13 @@ async def call_module(
     variables: Dict,
     inventory: Dict,
     c,
-    modules: Optional[List[str]]=None,
-    module_dirs: Optional[List[str]]=None,
-    gate_cache: Optional[Dict]=None,
-    dependencies: Optional[List[str]]=None,
+    modules: Optional[List[str]] = None,
+    module_dirs: Optional[List[str]] = None,
+    gate_cache: Optional[Dict] = None,
+    dependencies: Optional[List[str]] = None,
 ):
+
+    logger = mp.get_logger()
 
     if module_dirs is None:
         module_dirs = []
@@ -92,10 +96,10 @@ def run_rulesets(
     ruleset_queues: List[RuleSetQueue],
     variables: Dict,
     inventory: Dict,
-    redis_host_name: Optional[str]=None,
-    redis_port: Optional[int]=None,
-    module_dirs: Optional[List[str]]=None,
-    dependencies: Optional[List[str]]=None,
+    redis_host_name: Optional[str] = None,
+    redis_port: Optional[int] = None,
+    module_dirs: Optional[List[str]] = None,
+    dependencies: Optional[List[str]] = None,
 ):
 
     logger = mp.get_logger()
@@ -105,12 +109,13 @@ def run_rulesets(
     if redis_host_name and redis_port:
         provide_durability(durable.lang.get_host(), redis_host_name, redis_port)
 
-    plan: asyncio.Queue = asyncio.Queue()
-
     ruleset_queue_plans = [
-        RuleSetQueuePlan(ruleset, queue, asyncio.Queue()) for ruleset, queue in ruleset_queues
+        RuleSetQueuePlan(ruleset, queue, asyncio.Queue())
+        for ruleset, queue in ruleset_queues
     ]
-    ruleset_plans = [RuleSetPlan(ruleset, plan) for ruleset, _, plan in ruleset_queue_plans]
+    ruleset_plans = [
+        RuleSetPlan(ruleset, plan) for ruleset, _, plan in ruleset_queue_plans
+    ]
     rulesets = [ruleset for ruleset, _, _ in ruleset_queue_plans]
 
     logger.info(str([rulesets]))
@@ -123,7 +128,13 @@ def run_rulesets(
     asyncio.run(_run_rulesets_async(ruleset_queue_plans, dependencies, module_dirs))
 
 
-async def _run_rulesets_async(ruleset_queue_plans: List[RuleSetQueuePlan], dependencies: Optional[List[str]]=None, module_dirs: Optional[List[str]]=None):
+async def _run_rulesets_async(
+    ruleset_queue_plans: List[RuleSetQueuePlan],
+    dependencies: Optional[List[str]] = None,
+    module_dirs: Optional[List[str]] = None,
+):
+
+    logger = mp.get_logger()
 
     gate_cache: Dict = dict()
 
@@ -133,7 +144,6 @@ async def _run_rulesets_async(ruleset_queue_plans: List[RuleSetQueuePlan], depen
     build_ftl_gate(modules, module_dirs, dependencies)
 
     queue_readers = {i[1]._reader: i for i in ruleset_queue_plans}  # type: ignore
-
 
     while True:
         logger.info("Waiting for event")
